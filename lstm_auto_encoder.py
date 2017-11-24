@@ -9,9 +9,12 @@ from torch.autograd import Variable
 from torchvision import datasets, models
 import numpy as np
 import matplotlib.pyplot as plt
+import torch.utils.data
 
 import torch.utils.DataLoader
 
+
+#LSTM autoencoder model
 class Sequence(nn.Module):
     def __init__(self):
         super(Sequence,self).__init__()
@@ -43,26 +46,44 @@ class Sequence(nn.Module):
 
 model = Sequence()
 
-batch_size=50
 
-data_file =open('/home/sammer/Master_Thesis/Research/Code/videogan/data/list.txt','r')
-dataset = []
-for line in data_file:
-    dataset.append(line)
-
-class ImageDataSet(torch.utils.Dataset):
-    def __init__(self):
-        self.data_files = dataset
-        torch.sort(self.data_files)
-
-    def __getindex__(self, idx):
-        return self.data_files[idx]
-
-    def __len__(self):
-        return len(self.data_files)
-
-dset =ImageDataSet()
-loader = torch.utils.DataLoader(dset,num_workers=8)
+##load data
+path = "."
+activity_net_data = datasets.ImageFolder(path)
+data_loader = torch.utils.data.DataLoader(activity_net_data,batch_size=64,shuffle=True,num_workers=64)
 
 
+##train model
 
+
+for p in model.parameters():
+    print('parameters ', p.size())
+
+# optimizers = ["op1","op2","op3"]
+# foreach op in ops (so is all in one place)
+# optimizer = optim.Adadelta(model.parameters(), lr=0.01)
+optimizers = {'SGD': optim.SGD(model.parameters(), lr=0.01)}
+
+for name, optimizer in optimizers.items():
+    model.train()
+    train_loss = []
+    train_accu = []
+    i = 0
+    for epoch in range(10):
+        for data in data_loader :
+              # use cuda if available
+            img,_ = data
+            optimizer.zero_grad()
+            output = model.forward(data)
+
+            img = Variable(img).cuda()
+            loss = F.mse_loss(img,output)
+            loss.backward()  # calc gradients
+            train_loss.append(loss.data[0])
+            optimizer.step()  # update gradients
+            prediction = output.data.max(1)[1]  # first column has actual prob.
+
+            print('epoch [{}/{}], loss:{:.4f}'
+                .format(epoch + 1, 10, loss.data[0]))
+
+torch.save(model.state_dict(), './lstm_autoencoder.pth')
